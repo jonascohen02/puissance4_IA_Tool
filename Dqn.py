@@ -28,12 +28,13 @@ class DQNAgent:
 
     def build_model(self,load):
         """
-        Cette fonction permet de construire le modèle de l'agent DQN. Il est créé en utilisant la classe Sequential de keras 
+        Cette fonction permet de construire le modèle de l'agent DQN reposant sur le deep Q learning. Il est créé en utilisant la classe Sequential de keras du module tensorflow
         qui permet de créer un modèle en enchainant des couches les unes après les autres. Ici:
         - une input étant un vecteur de n lines où n est le nombre de case du jeu (L*l du jeu)
         - 2 couches cachées de 64 neuronnes avec comme fonction d'activation relu
         - Et en sortie un vecteur de n lignes où n représente le nombre d'action possible (donc de colonnes) en activation linéaire 
-            et non softmax car ce n'est pas une probabilité, la qualité d'une action ne dépend pas de la qualité des autres
+            et non softmax car ce n'est pas une probabilité, la pertinence d'une action ne dépend pas de la pertinence des autres, 2 actions peuvent être très pertinentes si on
+            peut gagenr de 2 manières par exemple.
 
         """
         if load:
@@ -63,7 +64,13 @@ class DQNAgent:
     def set_learning_rate(self, eps):
         self.learning_rate=eps
 
+    def set_gamma(self, eps):
+        self.discount_factor=eps
+
     def display_stats(self, rewards=None):
+        """
+        Affiche des informations pour suivre la progression de notre IA et connaître son évolution
+        """
         accuracy = self.stats["wins"]/self.stats["games"]
         print("\n \nStats de l'Agent ", self.session, 
         "\nepsilon: ", self.epsilon,
@@ -84,40 +91,39 @@ class DQNAgent:
         """
         if random.random() < self.epsilon:
             # Choisir une action aléatoirement
-            # print("Random action:")
             return (True, random.choice(self.game.legal_actions))
         else:
             # Utiliser le modèle pour prédire les valeurs Q pour chaque action
-            # print(state)
             q_values = self.model.predict(state, verbose=0)[0]
-            # print(q_values)
+            # On séléctionne la valeur la plus élevé
             bestAction = np.argmax(q_values)
+            # Si l'action choisi est interdite, on retourne False pour indiquer une mauvaise action ainsi que cette dernière
             if bestAction not in self.game.legal_actions:
                 return (False, bestAction)
             else:
-                return (True, bestAction)
-            # print("Action choisi", choosenAction)
-            # choosenAction = np.argmax([q_values[i] if i in legal_actions else -float('inf') for i in range(self.num_actions)])
-            # Retourne l'action qui a la valeur Q la plus élevée (parmi les actions légales)
-            
+                return (True, bestAction)            
 
 
 
     def update(self, state, actions, rewards, next_states, epochs=1,verbose=2):
         """
-        Cette fonction permet de mettre à jour les valeurs Q de l'agent DQN en utilisant l'algorithme de Q-Learning.
-        Elle prend en entrée l'état actuel, l'action choisie, la récompense obtenue, l'état suivant (après coup de l'adversaire) 
-        et les actions autorisées dans cet état suivant.
+        Cette fonction permet de mettre à jour les valeurs Q de l'agent DQN en utilisant l'algorithme de Q-Learning 
+        reposant sur l'équations de Bellman (Semblable à une suite défini par réccurence avec 2 variables):
+        "La Q value à l'état S et avec l'action A à l'instant t est égale à la récompense à cet instant + discount_factor * la q valeur maximale à t+1"
+        Elle prend donc en entrée l'état initiale, l'action choisie, la récompense obtenue, l'état suivant (après coup de l'adversaire).
         """
         # On utilise le modèle pour prédire les valeurs Q pour l'état actuel
 
-        # On transforme les tableaux/liste en matrices
+        # On transforme les tableaux/liste en matrices pour accélérer les calculs (plus de 10000 lignes à chaque calcul)
         npStates = np.array(state)
         npNextStates = np.array(next_states)
         npRewards = np.array(rewards)
         npActions = np.array(actions)
 
+        # Longueur de l'échantillon
         size = len(npStates)
+
+        # Utile pour les opérations matricielles
         npArangeSize = np.arange(size) #[0,1,2,3,..,n]
 
         # On met à jour la valeur Q uniquement pour l'action choisie
@@ -127,25 +133,29 @@ class DQNAgent:
 
         # Création des Q targets:
 
-        # Calcul de l'eperence de la récompense maximale au prochain tour en prédisant avec l' état suivant
+        # Calcul de l'eperence de la récompense maximale au prochain tour en prédisant avec l'état suivant
         next_q_values = self.model.predict(npNextStates,verbose=0)
         
-        # On calcule les valeures que l'on aurait du avoir (estimation):
-        # On récupère une matrice contenant les valeurs maximales prédites pour chaque lignes puis on applique la formule des Q values:
+        # On calcule les valeures que l'on aurait du avoir (estimation) pour la Q value:
+        # On récupère une matrice contenant les valeurs maximales prédites pour chaque lignes puis on applique l'équation de Bellman:
         # On multiple par le discount_factor (gamma) et auquel on ajoute les npRewards
+        # On obtient une matrice contenant toutes les q_values que le modèle aurait du prédire
         q_target_values = next_q_values[npArangeSize, np.argmax(next_q_values,1)] * self.discount_factor + npRewards
         
-        # On récupère les Q valeurs pour l'état avant action
+        # On récupère une matrice contenant les Q values préditess par le modèle pour l'état S et on va modifier l'action choisi
+        # par la q_target_values pour chaque ligne de la matrice dans l'instruction d'après
         q_target = self.model.predict(npStates, verbose=0)
 
-        # On remplace uniquement les valeurs des actions CHOISI par les q_target
+        # Ici, on remplace donc uniquement les valeurs de l'action CHOISI pour chaque ligne par la q_target_value
         q_target[npArangeSize, npActions] = q_target_values
 
 
         # On utilise cette nouvelle valeur pour entraîner le modèle q_target est la cible tandis que les q_values seront automatiquement
         # prédites à partir des npStates 
-        # L'erreur (ici caclulcé avec la méthode mean squared error MSE) et le gradient se calcule aussi automatiquement
-        #Le modèle va s'entraîner sur toute la longueur size des tableaux et va répéter l'opération epochs fois
+        # L'erreur (ici caclulcé avec la méthode mean squared error MSE qui représente l'écart entre les q_target et les q prédites) et le gradient se calcule aussi automatiquement
+        # Le modèle va s'entraîner sur toute la longueur size des matrices et va répéter l'opération epochs fois
+        # Pour un échantillon de 10 000 états/action/rewards avec une époques de 100, on aura donc 1 Milion d'itération (sans matrice),
+        # simplifié à 100 calculs matriciels de 10 000 lignes chacun
         self.model.fit(npStates, q_target, epochs=epochs, verbose=verbose)
         
         # callbacks=[self.tensorboard_callback]

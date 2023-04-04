@@ -4,8 +4,8 @@ import numpy as np
 import random
 import tensorflow as tf
 from Dqn import DQNAgent
-from env import Game
-from training import play_episode
+from Env import Game
+from functions import play_episode
 # Disable absl INFO and WARNING log messages
 from absl import logging as absl_logging
 absl_logging.set_verbosity(absl_logging.ERROR)
@@ -106,20 +106,37 @@ if __name__ == "__main__":
     game = Game(6, 7)
     # Voici la grille ainsi créé, une matrice de 6x7
     # grid= [
-    #     [1,2,1,0,0,0,0],
     #     [0,0,0,0,0,0,0],
     #     [0,0,0,0,0,0,0],
     #     [0,0,0,0,0,0,0],
     #     [0,0,0,0,0,0,0],
-    #     [0,0,0,0,0,0,0]
+    #     [0,0,0,0,0,0,0],
+    #     [0,2,1,0,0,0,0]
     # ]
-    agent1 = DQNAgent(game,session=0, epsilon=0.8,learning_rate=0.01)    # 0.9 Model ia2 !
+
+
+    # Création de 2 agents:
+    agent1 = DQNAgent(game,session=0, epsilon=0.8,learning_rate=0.01)
+    agent2 = DQNAgent(game,session=1, epsilon=0.8,learning_rate=0.01)
     # agent2 = DQNAgent(game,session=1, epsilon=0.8,learning_rate=0.01, loadModel='ia2/')    # 0.9
-    # agent1 = DQNAgent(game,session=2, epsilon=0.1, learning_rate=0.01, loadModel="against-human/")    # 0.7
     # play_against(agent2,False,15)
     os.system("cls")
-    play_against(agent1,train=False,n=5)
-    agent1.model_save("ia1/")
+    play_against(DQNAgent(game,session=1, epsilon=0,learning_rate=0.01, loadModel="ia1/"),train=False,n=5)
+    for i in range(10):
+        newEps = max(0.1,(1-i)/10)
+        print("\n\nNew Epsilon = ",newEps," \n\n")
+        agent1.set_epsilon(newEps)
+        agent2.set_epsilon(newEps)
+        play_episode(agent1,agent2,1000,20, game, maxSize=10000)
+        agent1.display_stats()
+        agent2.display_stats()
+
+
+
+
+# ATTENTION INVERSE GAME DANS PLAY EPISODE
+
+
     # for i in range(10):
         # newEps = max(0.1,(1-i)/10)
         # print("\n\nNew Epsilon = ",newEps," \n\n")

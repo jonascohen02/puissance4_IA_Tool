@@ -3,12 +3,6 @@ import random
 import tensorflow as tf
 import os
 from copy import deepcopy
-# Première étape, à tester sur 1 épisode pour vérifier le tableau en sortie 
-# + Vérifier en cas d'égalité ! 
-
-# TO DO: 
-# Ajouter une fonctionnalité pour lancer les états en mode aléatoire sans forcément du début
-# Verifier si y'a blocage, si oui, +1
 
 
 states = [[],[]]
@@ -16,7 +10,7 @@ actions = [[],[]]
 rewards = [[],[]]
 nextstates=[[],[]]
 
-def play_episode(p1,p2,numberEpisodes, trainRate, game, maxSize=10000):
+def play_episode(p1,p2,game, numberEpisodes, trainRate, maxSize=10000):
     global counter_game
     players = [p1, p2]
     # Boucle d'entraînement
