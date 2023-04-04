@@ -24,11 +24,17 @@ def play_episode(p1,p2,game, numberEpisodes, trainRate, maxSize=10000):
         p1.stats["games"] += 1
         p2.stats["games"] += 1
         game.reset()
+        # On démarre le jeu au hasard
         random.shuffle(players)
         game.player = players[0].session+1
+        
+        # A chaque coup:
         while game.winner is None:
+            # Utilisé pour insérer chaque ligne de l'échantillon dans un ordre aléatoire
             randomIndex = random.random()
+            # Index du joueur en cours
             indexPlayer = players[p%2].session
+            # Index de l'adversaire
             indexNextPlayer = players[(p+1)%2].session
 
             state = deepcopy(game.grid)        #Eviter que lors de la modification, tous les states se modifient     
@@ -65,13 +71,15 @@ def play_episode(p1,p2,game, numberEpisodes, trainRate, maxSize=10000):
             # Sauvegarde de l'état actuel comme étant l'état suivant le coup du joueur précédent (adversaire, aussi celui qui joue après) 
             new_state = deepcopy(game.grid)
 
-            # On ajoute cet état au même index que les précédents states actions seulement si p!=0 car l'adversaire n'a pas encore joué
+            # On ajoute cet état au même index que les précédents states actions seulement si p!=0 car sinon l'adversaire n'a pas encore joué
             if p!=0:
                 nextstates[indexNextPlayer].insert(round(prevRandomIndex*len(nextstates[indexNextPlayer])),new_state)
 
 
             # Si égalité:
             if winner == "egal":
+                # On affecte les récompenses de 1 pour tous et on modifie les stats
+                # On ajoute aussi l'état actuel à l'état suivant de l'adversaire
                 rewards[indexPlayer].insert(round(randomIndex*len(rewards[0])),rewardPlayer+1)
                 rewards[indexNextPlayer].insert(round(prevRandomIndex*len(rewards[1])),rewardPlayer+1)
                 nextstates[indexPlayer].insert(round(randomIndex*len(nextstates[indexPlayer])),new_state)
@@ -81,27 +89,27 @@ def play_episode(p1,p2,game, numberEpisodes, trainRate, maxSize=10000):
 
             # Si p%2 a gagné:
             elif winner is not None:
+                # On affecte les récompenses de 15 à celui qui vient de jouer (et donc de gagner) et -15 à l'adversaire et on modifie les stats
+                # On ajoute aussi l'état actuel à l'état suivant de l'adversaire
                 rewards[indexPlayer].insert(round(randomIndex*len(rewards[indexPlayer])),rewardPlayer+15)
                 rewards[indexNextPlayer].insert(round(prevRandomIndex*len(rewards[indexNextPlayer])),rewardPlayer-15)
                 nextstates[indexPlayer].insert(round(randomIndex*len(nextstates[indexPlayer])),new_state)
                 players[p%2].stats["wins"] += 1
                 break
 
-            # Ni p%2 ni (p+1)%2 n'a gagné (ce dernier n'a pas joué), donc coup suivant
+            # Ni p%2 ni (p+1)%2 n'a gagné (ce dernier n'a pas joué), donc coup suivant et on ajoute la récompense de 0 à l'adversaire
             else:
                 if p!=0:
                     rewards[indexNextPlayer].insert(round(prevRandomIndex*len(rewards[indexNextPlayer])),rewardPlayer+0)
             p +=1
+            # On sauvegarde le randomIndex pour pouvoir sauvegarder les récompenses et next_state du joueur actuel
             prevRandomIndex = randomIndex
         
 
-        # if (counter)%100 == 0:
-        #     print("Partie n°{}".format(counter))
-        #     print("Player 1 Rows length: ",len(states[0]))
-        #     print("Player 2 Rows length: ",len(states[1]))
-
         # Tous les x parties, on train nos modeles
         if (episode+1)%trainRate == 0 and len(states[indexPlayer]) > (maxSize-trainRate*21):
+            # On affiche des informations
+            # On lance la fonction qui train automatiquement
             print("\n\n\nEpisode n°", episode+1)
             print("\n\nAgent1:")
             print("Length data: ",len(states[0])," rows\n")
@@ -109,8 +117,12 @@ def play_episode(p1,p2,game, numberEpisodes, trainRate, maxSize=10000):
             print("\n\nAgent2:")
             print("Length data: ",len(states[1])," rows\n")
             p2.update(states[p2.session],actions[p2.session],rewards[p2.session],nextstates[p2.session])
+
+            # On affiche les stats
             p1.display_stats(rewards[0])
             p2.display_stats(rewards[1])
+
+            # On fait une sauvegarde des modèles
             p1.model_save("ia1/")
             p2.model_save("ia2/")
 
@@ -122,10 +134,14 @@ def play_episode(p1,p2,game, numberEpisodes, trainRate, maxSize=10000):
             actions[indexPlayer] = actions[indexPlayer][1:maxSize]
             rewards[indexPlayer] = rewards[indexPlayer][1:maxSize]
     
+        # Débuter les entraînements à partir du moment ou l'ensemble est plein
         if(len(states[indexPlayer]) > (maxSize-trainRate*21)):
-            # Débuter les entraînements à partir du moment ou l'ensemble est plein
             episode += 1
-        
+            
+        # Affiche un message toutes les 10 parties
+        # if counter%10 == 10:
+        print("\n\n\nPartie n°", counter+1)
+        print("Length data: ", len(states[0])," rows\n")
         counter += 1
 
 
@@ -137,24 +153,43 @@ def play_against(p1, game, train=False, numberEpisodes=1, trainRate=None, maxSiz
 
     episode = 0
     counter = 1
+
+    previous = {
+        "state":'',
+        "action" :'',
+        "reward":''
+    }
     while episode < numberEpisodes:
         p = 1 if random.random() > 0.5 else 0
         p1.stats["games"] += 1
+        # On reset le jeu
         game.reset()
 
+        # Tant que le jeu n'est pas fini, à chaque coup:
         while game.winner is None:
+            # Utilisé pour insérer chaque ligne de l'échantillon dans un ordre aléatoire
             randomIndex = random.random()
+            # Eviter que lors de la modification de la grille, tous les states se modifient     
             state = deepcopy(game.grid) 
+
+            # Détermine si le joueur actuel est humain ou pas
             if p%2 == 0:   
+                # On affiche la grille et demande au joueur une colonne tant que la réponse n'est pas correcte
                 game.display_grid()
                 userAction = input("Choose a column (1-7): ")
                 while not userAction.isdigit() or int(userAction)-1 not in game.legal_actions:
                     # os.system("cls")
                     game.display_grid()
                     userAction = input("Invalid choice, retry (1-7): ")
+                # les vraies index des colonnes sont de 0 à 6
                 action = int(userAction)-1
+            
             else: 
+                # On convertit la grille de liste en matrice
                 np_state = np.array(state).reshape((1, game.height, game.width))
+
+                # On prédit une action, si l'action n'est pas autorisée, reward négatif, update pour ne pas boucler à l'infini
+                # et on redemande
                 predictAction = p1.get_action(np_state)
                 while not predictAction[0]:
                     tempRandom = random.random() 
@@ -169,91 +204,83 @@ def play_against(p1, game, train=False, numberEpisodes=1, trainRate=None, maxSiz
                 action = predictAction[1]
                 # randomIndex previous["action"] = action
                 # randomIndex previous["state"] = state
+                if train:
+                    previous["action"] = action
+                    previous["state"] = state
             
-            winner,reward = game.add_piece(action)
-            new_state = np.array(game.grid).reshape((1, game.height, game.width))
+            # Envoie de l'action au jeu
+            winner, reward = game.add_piece(action)
+            if p%2 == 1 and train:
+                previous["reward"] = reward
+            new_state = deepcopy(game.grid)
+
+            # Si égalité:
+            if winner == "egal":
+                # On affecte les récompenses de 1 pour tous et on modifie les stats
+                # On ajoute aussi l'état actuel à l'état suivant de l'adversaire
+                if train:
+                    if p%2 == 0:
+                        rewards[0].insert(round(randomIndex*len(rewards[0])),previous["reward"]+1)
+                        nextstates[0].insert(round(randomIndex*len(nextstates[0])),new_state)
+                        states[0].insert(round(randomIndex*len(nextstates[0])),previous["state"])
+                        actions[0].insert(round(randomIndex*len(nextstates[0])),previous["action"])
+                    else:
+                        rewards[0].insert(round(randomIndex*len(rewards[0])),previous["reward"]+1)
+                        nextstates[0].insert(round(randomIndex*len(nextstates[0])),new_state)
+                        states[0].insert(round(randomIndex*len(nextstates[0])),previous["state"])
+                        actions[0].insert(round(randomIndex*len(nextstates[0])),previous["action"])
+                p1.stats["egalites"] += 1
+                break
+
+            # Si p%2 a gagné:
+            elif winner is not None:
+                if train:
+                    if p%2 == 0:
+                        rewards[0].insert(round(randomIndex*len(rewards[0])),previous["reward"]-15)
+                        nextstates[0].insert(round(randomIndex*len(nextstates[0])),new_state)
+                        states[0].insert(round(randomIndex*len(nextstates[0])),previous["state"])
+                        actions[0].insert(round(randomIndex*len(nextstates[0])),previous["action"])
+                    else:
+                        rewards[0].insert(round(randomIndex*len(rewards[0])),previous["reward"]+15)
+                        nextstates[0].insert(round(randomIndex*len(nextstates[0])),new_state)
+                        states[0].insert(round(randomIndex*len(nextstates[0])),previous["state"])
+                        actions[0].insert(round(randomIndex*len(nextstates[0])),previous["action"])
+                        p1.stats["wins"] += 1
+                break
+
+            # Ni p%2 ni (p+1)%2 n'a gagné (ce dernier n'a pas joué), donc coup suivant et on ajoute la récompense de 0 à l'adversaire
+            else:
+                if train and p%2 == 0 and p!=0:
+                    rewards[0].insert(round(randomIndex*len(rewards[0])),previous["reward"])
+                    nextstates[0].insert(round(randomIndex*len(nextstates[0])),new_state)
+                    states[0].insert(round(randomIndex*len(nextstates[0])),previous["state"])
+                    actions[0].insert(round(randomIndex*len(nextstates[0])),previous["action"])
+            p +=1
+        # Tous les x parties, on train nos modeles
+        if (episode+1)%trainRate == 0 and len(states[0]) > (maxSize-trainRate*21):
+            # On affiche des informations
+            # On lance la fonction qui train automatiquement
+            print("\n\n\nEpisode n°", episode+1)
+            print("\n\nAgent1:")
+            print("Length data: ",len(states[0])," rows\n")
+            p1.update(states[p1.session],actions[p1.session],rewards[p1.session],nextstates[p1.session])
+
+            # On affiche les stats
+            p1.display_stats(rewards[0])
+
+            # On fait une sauvegarde des modèles
+            p1.model_save("against-humain/")
 
 
-
-    global counter_game
-    game.reset()
-    # print("\n \n Agent ",agent.session,": accuracy",agent.stats["accuracy"],"\n")
-    for episode in range(n):
-        game.reset()
-        previous = {
-            "state":'',
-            "action" :'',
-        }
-        state = np.array(game.grid).reshape((1, game.height, game.width))
+        # Si plus de 10000 éléments dans le tableau, on retire le dernier 
+        if len(states[0]) > maxSize:
+            states[0] = states[0][1:maxSize]
+            nextstates[0] = nextstates[0][1:maxSize]
+            actions[0] = actions[0][1:maxSize]
+            rewards[0] = rewards[0][1:maxSize]
+    
+        # Débuter les entraînements à partir du moment ou l'ensemble est plein
+        if(len(states[0]) > (maxSize-trainRate*21)):
+            episode += 1
         
-        # IA qui commence, 1 sinon humain commence et 0 donc p%2 = humain
-        p = 1 if random.random() > 0.5 else 0
-        while game.winner is None:
-            # Si l'humain joue p=0
-            if p%2 == 0:
-                # On Vérifie que l'entrée est un nombre et est autorisée
-                # os.system("cls")
-                game.display_grid()
-                userAction = input("Choose a column (1-7): ")
-                while not userAction.isdigit() or int(userAction)-1 not in game.legal_actions:
-                    # os.system("cls")
-                    game.display_grid()
-                    userAction = input("Invalid choice, retry (1-7): ")
-                action = int(userAction)-1     
-            else:
-                # Action, 1 step:
-                np_state = np.array(state).reshape((1, game.height, game.width))
-                predictAction = agent.get_action(np_state)
-                while not predictAction[0]:
-                    agent.update([game.grid], [predictAction[1]], [-20], [game.grid], epochs=2, verbose=0)
-                    predictAction = agent.get_action(np_state)
-                action = predictAction[1]
-                previous["action"] = action
-                previous["state"] = state
-
-            winner,reward = game.add_piece(action)
-            new_state = np.array(game.grid).reshape((1, game.height, game.width))
-
-            if winner is None:
-                # Pas de gagnant, on continue et reward de 0
-                r=0
-                forceUpdate = False
-            elif winner =="egal":
-                # Egalite reward de 0
-                r=0
-                agent.stats["egalites"] += 1
-                # os.system("cls")
-                game.display_grid()
-                print("Égalité, pas de vainqueurs")
-                forceUpdate = True
-            else:
-                # Victoire d'un joueur, si p%2=0, l'humain gagne donc reward de -1 sinon 1
-                r = -1 if p%2 == 0 else 1
-                agent.stats["wins"]+=p%2 #Update stats, +1 victoire (car p%2 sera égale à 1) si il gagne, sinon 0
-                # os.system("cls")
-                game.display_grid()
-                print("Player ", winner, "wins! \n")
-                forceUpdate = True
-
-            # On entraine l'IA tous les deux coups sauf au premier coup car le new_state correspond à l'état après l'action de l'IA + celle du joueur sauf dernier coup:
-            # forceUpdate est True si il n'y a plus de coup après, dans le cas ou l'IA gagne ou fait une egalite. Ainsi on attend plus le coup de l'adversaire
-            if train and (p%2==0 and p!=0 or forceUpdate):
-                # print("\nPrevious state: ", previous["state"],
-                # '\nPrevious: ',previous["action"],
-                # '\nReward: ',r,
-                # '\nNew state: ',new_state,
-                # '\nGame winner: ',game.winner,
-                # '\nP%2 =',p%2,"\n\n"
-                # )
-                agent.update(previous["state"], previous["action"], r, new_state, game.legal_actions)
-            
-            # if forceUpdate:
-            #     break
-            p+=1
-            state = new_state
-        counter_game +=1
-        agent.stats["games"]+=1
-    if train:
-        agent.model_save("against-human/")
-    agent.display_stats()
-
+        counter += 1

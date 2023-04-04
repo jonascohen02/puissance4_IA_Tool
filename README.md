@@ -29,6 +29,8 @@ play_episode(p1,p2,numberEpisodes, trainRate, game, maxSize=10000) qui prend com
 - un environnement (game)
 - la longueur maximale de l'échantillon d'états/actions à utiliser (par défaut de 10 000, dépendant de la mémoire vive de votre ordinateur)
 
+L'entraînement démarre quand la taille de l'échantillon (length data) est environ égale à la longueur maximum
+
 La fonction va faire des sauvegardes des 2 modèles automatiquement toutes les trainRate parties dans un dossier ia1/ et ia2/
 On peut ensuite sauvegarder les modèles à d'autres emplacement
 
@@ -50,11 +52,11 @@ play_against(p1, game, train=False, numberEpisodes=1, trainRate=None, maxSize=10
 - p1: l'agent à affronter
 - game: l'environnement dans lequel jouer
 Facultatif:
+- numberEpisodes: le nombre de parties à jouer
 - train: s'il faut ou non entraîner le modèle pendant qu'il joue contre vous
 Obligatoire si train=True:
-- numberEpisodes: le nombre de parties à jouer
 - trainRate: Toutes les combiens de parties, l'entraînement doit-il se faire (en général, environ 20) en reprenant toutes les parties effectués dans la limite de la taille maxSize
 - maxSize: la longueur maximale de l'échantillon d'états/actions à utiliser (par défaut de 10 000, dépendant de la mémoire vive de votre ordinateur)
 Si train=True, 
-La fonction va faire des sauvegardes des 2 modèles automatiquement toutes les trainRate parties dans un dossier against-human/
+La fonction va faire des sauvegardes des 2 modèles automatiquement toutes les trainRate parties dans un dossier against-humain/
 On peut ensuite sauvegarder les modèles à d'autres emplacement
