@@ -57,7 +57,7 @@ class Game:
         for row in self.grid:
             displayRow = map(self.convert_numbers_to_char, row)
             print((" "*lenW).join(displayRow))
-
+        # print("Player {}".format(self.player))
 
 
     def add_piece(self, column):
@@ -79,7 +79,7 @@ class Game:
                     self.legal_actions = [i for i in self.legal_actions if i != column]
                 break
         self.winner = self.check_win()
-        reward = self.get_reward(*playerPiece)
+        reward = self.get_reward(*playerPiece)            
         self.player = 2 if self.player == 1 else 1
         return (self.winner, reward)
 

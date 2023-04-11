@@ -1,7 +1,5 @@
 import numpy as np
 import random
-import tensorflow as tf
-import os
 from copy import deepcopy
 
 
@@ -164,7 +162,7 @@ def play_against(p1, game, train=False, numberEpisodes=1, trainRate=None, maxSiz
         p1.stats["games"] += 1
         # On reset le jeu
         game.reset()
-
+        game.display_grid()
         # Tant que le jeu n'est pas fini, à chaque coup:
         while game.winner is None:
             # Utilisé pour insérer chaque ligne de l'échantillon dans un ordre aléatoire
@@ -175,12 +173,10 @@ def play_against(p1, game, train=False, numberEpisodes=1, trainRate=None, maxSiz
             # Détermine si le joueur actuel est humain ou pas
             if p%2 == 0:   
                 # On affiche la grille et demande au joueur une colonne tant que la réponse n'est pas correcte
-                game.display_grid()
-                userAction = input("Choose a column (1-7): ")
+                userAction = input("Player {}:\nChoose a column (1-7): ".format(game.player))
                 while not userAction.isdigit() or int(userAction)-1 not in game.legal_actions:
-                    # os.system("cls")
                     game.display_grid()
-                    userAction = input("Invalid choice, retry (1-7): ")
+                    userAction = input("Player {}:\nInvalid choice, retry (1-7): ".format(game.player))
                 # les vraies index des colonnes sont de 0 à 6
                 action = int(userAction)-1
             
@@ -202,20 +198,22 @@ def play_against(p1, game, train=False, numberEpisodes=1, trainRate=None, maxSiz
                     p1.update([game.grid], [predictAction[1]], [-20], [game.grid], epochs=2, verbose=0)
 
                 action = predictAction[1]
-                # randomIndex previous["action"] = action
-                # randomIndex previous["state"] = state
+                print("Player {}:\nAction choosen: {}".format(game.player,action+1))
                 if train:
                     previous["action"] = action
                     previous["state"] = state
             
             # Envoie de l'action au jeu
             winner, reward = game.add_piece(action)
+            print("\n")
+            game.display_grid()
             if p%2 == 1 and train:
                 previous["reward"] = reward
             new_state = deepcopy(game.grid)
 
             # Si égalité:
             if winner == "egal":
+                print("\n\n\nEgalites, no winner ! \n\n\n")
                 # On affecte les récompenses de 1 pour tous et on modifie les stats
                 # On ajoute aussi l'état actuel à l'état suivant de l'adversaire
                 if train:
@@ -234,6 +232,7 @@ def play_against(p1, game, train=False, numberEpisodes=1, trainRate=None, maxSiz
 
             # Si p%2 a gagné:
             elif winner is not None:
+                print("\n\n\nWinner: Player {} \n\n\n".format(game.winner))
                 if train:
                     if p%2 == 0:
                         rewards[0].insert(round(randomIndex*len(rewards[0])),previous["reward"]-15)
@@ -282,5 +281,5 @@ def play_against(p1, game, train=False, numberEpisodes=1, trainRate=None, maxSiz
         # Débuter les entraînements à partir du moment ou l'ensemble est plein
         if(len(states[0]) > (maxSize-trainRate*21)):
             episode += 1
-        
+
         counter += 1
